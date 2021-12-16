@@ -1,72 +1,41 @@
 version: 2.1
 
-commands:
-  restore_cache_cmd:
-    steps:
-      - restore_cache:
-          keys:
-            - v1-dependencies-{{ checksum "pom.xml" }}
-            - v1-dependencies-
-  save_cache_cmd:
-    steps:
-      - save_cache:
-          paths:
-            - ~/.m2
-          key: v1-dependencies-{{ checksum "pom.xml" }}
-  test:
-    steps:
-      - checkout
-      - restore_cache_cmd
-      - run: ./mvnw test
-      - save_cache_cmd
-  build:
-    steps:
-      - checkout
-      - restore_cache_cmd
-      - run: ./mvnw -Dmaven.test.skip=true package
-      - save_cache_cmd
-
-executors:
- docker-executor:
-   docker:
-     - image: circleci/openjdk:9.0.4-12
- machine-executor:
-   machine:
-     image: ubuntu-1604:201903-01
-
-jobs:
-  test-with-docker:
-    executor: docker-executor
-    steps:
-      - test
-
-  build-with-docker:
-    executor: docker-executor
-    steps:
-      - build
-
-  test-with-machine:
-    executor: machine-executor
-    steps:
-      - test
-
-  build-with-machine:
-    executor: machine-executor
-    steps:
-      - build
-
+orbs:
+  # The python orb contains a set of prepackaged circleci configuration you can use repeatedly in your configurations files
+  # Orb commands and jobs help you with common scripting around a language/tool
+  # so you dont have to copy and paste it everywhere.
+  # See the orb documentation here: https://circleci.com/developer/orbs/orb/circleci/python
+  python: circleci/python@1.2
 
 workflows:
-  build-then-test-with-docker:
+  sample:  # This is the name of the workflow, feel free to change it to better match your workflow.
+    # Inside the workflow, you define the jobs you want to run.
+    # For more details on extending your workflow, see the configuration docs: https://circleci.com/docs/2.0/configuration-reference/#workflows
     jobs:
-      - build-with-docker
-      - test-with-docker:
-          requires:
-            - build-with-docker
+      - build-and-test
 
-  build-then-test-with-machine:
-    jobs:
-      - build-with-machine
-      - test-with-machine:
-          requires:
-            - build-with-machine
+
+jobs:
+  build-and-test:  # This is the name of the job, feel free to change it to better match what you're trying to do!
+    # These next lines defines a docker executors: https://circleci.com/docs/2.0/executor-types/
+    # You can specify an image from dockerhub or use one of the convenience images from CircleCI's Developer Hub
+    # A list of available CircleCI docker convenience images are available here: https://circleci.com/developer/images/image/cimg/python
+    # The executor is the environment in which the steps below will be executed - below will use a python 3.9 container
+    # Change the version below to your required version of python
+    docker:
+      - image: cimg/python:3.9
+    # Checkout the code as the first step. This is a dedicated CircleCI step.
+    # The python orb's install-packages step will install the dependencies from a Pipfile via Pipenv by default.
+    # Here we're making sure we use just use the system-wide pip. By default it uses the project root's requirements.txt.
+    # Then run your tests!
+    # CircleCI will report the results back to your VCS provider.
+    steps:
+      - checkout
+      - python/install-packages:
+          pkg-manager: pip
+          # app-dir: ~/project/package-directory/  # If you're requirements.txt isn't in the root directory.
+          # pip-dependency-file: test-requirements.txt  # if you have a different name for your requirements file, maybe one that combines your runtime and test requirements.
+      - run:
+          name: Run tests
+          # This assumes pytest is installed via the install-package step above
+          command: pytest
